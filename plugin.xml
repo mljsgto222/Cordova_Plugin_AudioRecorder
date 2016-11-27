@@ -4,15 +4,26 @@
     xmlns:android="http://schemas.android.com/apk/res/android">
     <name>AudioRecorder</name>
     <js-module name="AudioRecorder" src="www/AudioRecorder.js">
-        <clobbers target="cordova.plugins.AudioRecorder" />
+        <clobbers target="AudioRecorder" />
     </js-module>
     <platform name="android">
         <config-file parent="/*" target="res/xml/config.xml">
             <feature name="AudioRecorder">
-                <param name="android-package" value="com.mljsgto222.cordova.plugin.audiorecorder.AudioRecorder" />
+                <param name="android-package" value="com.mljsgto222.cordova.plugin.audiorecorder" />
             </feature>
         </config-file>
-        <config-file parent="/*" target="AndroidManifest.xml"></config-file>
-        <source-file src="src/android/AudioRecorder.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder/AudioRecorder" />
+        <config-file parent="/*" target="AndroidManifest.xml">
+            <uses-permission android:name="android.permission.RECORD_AUDIO" />
+            <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+            <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+        </config-file>
+        <source-file src="src/android/AudioRecorder.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder" />
+        <source-file src="src/android/DataEncodeThread.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder" />
+        <source-file src="src/android/MP3Recorder.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder" />
+        <source-file src="src/android/PCMFormat.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder" />
+        <source-file src="src/android/RingBuffer.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder" />
+        <source-file src="src/android/SimpleLame.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder" />
+        <source-file src="src/android/libs/armeabi/libmp3lame.so" target-dir="libs/armeabi"></source-file>
+        <source-file src="src/android/libs/armeabi-v7a/libmp3lame.so" target-dir="libs/armeabi-v7a"></source-file>
     </platform>
 </plugin>
