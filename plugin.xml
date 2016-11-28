@@ -9,7 +9,7 @@
     <platform name="android">
         <config-file parent="/*" target="res/xml/config.xml">
             <feature name="AudioRecorder">
-                <param name="android-package" value="com.mljsgto222.cordova.plugin.audiorecorder" />
+                <param name="android-package" value="com.mljsgto222.cordova.plugin.audiorecorder.AudioRecorder" />
             </feature>
         </config-file>
         <config-file parent="/*" target="AndroidManifest.xml">

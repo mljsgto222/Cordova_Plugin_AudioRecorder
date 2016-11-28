@@ -1,5 +1,6 @@
 package com.mljsgto222.cordova.plugin.audiorecorder;
 
+import android.content.Context;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
@@ -7,6 +8,9 @@ import android.os.Environment;
 import android.os.Message;
 import android.util.Log;
 
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -26,6 +30,10 @@ public class MP3Recorder {
     private static final int FRAME_COUNT = 320;
     private static final int BIT_RATE = 16;
 
+    private static final String OUT_SAMPLING_RATE = "outSamplingRate";
+    private static final String OUT_BIT_RATE = "outBitRate";
+    private static final String SAVE_DIRECTORY_NAME = "saveDirectoryName";
+
     private AudioRecord audioRecord = null;
     private int bufferSize;
     private File mp3File;
@@ -37,15 +45,41 @@ public class MP3Recorder {
     private int chanelConfig;
     private PCMFormat audioFormat;
     private boolean isRecording = false;
+    private int bitRate;
+    private String directoryName;
 
-    public MP3Recorder(int samplingRate, int chanelConfig, PCMFormat audioFormat){
+    public MP3Recorder(int samplingRate, int chanelConfig, PCMFormat audioFormat, int bitRate, String directoryName){
         this.samplingRate = samplingRate;
         this.chanelConfig = chanelConfig;
         this.audioFormat = audioFormat;
+        this.bitRate = bitRate;
+        this.directoryName = directoryName;
     }
 
-    public MP3Recorder(){
-        this(DEFAULT_SAMPLING_RATE, AudioFormat.CHANNEL_IN_MONO, PCMFormat.PCM_16BIT);
+    public MP3Recorder(Context context){
+        this.samplingRate = DEFAULT_SAMPLING_RATE;
+        this.chanelConfig = AudioFormat.CHANNEL_IN_MONO;
+        this.audioFormat = PCMFormat.PCM_16BIT;
+        this.bitRate = BIT_RATE;
+
+        int appNameId = context.getApplicationInfo().labelRes;
+        this.directoryName = appNameId == 0? context.getApplicationInfo().nonLocalizedLabel.toString(): context.getString(appNameId);
+
+    }
+
+    public MP3Recorder(JSONObject options, Context context) throws JSONException{
+        this(context);
+
+        if(options.has(OUT_SAMPLING_RATE)){
+            this.samplingRate = options.getInt(OUT_SAMPLING_RATE);
+        }
+        if(options.has(OUT_BIT_RATE)){
+            this.bitRate = options.getInt(OUT_BIT_RATE);
+        }
+        if(options.has(SAVE_DIRECTORY_NAME)){
+            this.directoryName = options.getString(SAVE_DIRECTORY_NAME);
+        }
+
     }
 
     public void startRecord() throws IOException {
@@ -109,12 +143,12 @@ public class MP3Recorder {
         ringBuffer = new RingBuffer(10 * bufferSize );
         buffer = new short[bufferSize];
 
-        int result = SimpleLame.init(DEFAULT_IN_SAMPLING_RATE, 2, samplingRate, BIT_RATE);
+        int result = SimpleLame.init(DEFAULT_IN_SAMPLING_RATE, 2, samplingRate, bitRate);
         if(result < 0){
             Log.e(TAG, "init SimpleLame:" + result);
         }
         String externalPath = Environment.getExternalStorageDirectory().getAbsolutePath();
-        File directory = new File(externalPath + "/JiMaiX");
+        File directory = new File(externalPath + "/" + directoryName);
         if(!directory.exists()){
             directory.mkdir();
         }

@@ -1,6 +1,7 @@
 package com.mljsgto222.cordova.plugin.audiorecorder;
 
-import android.widget.Toast;
+import android.net.Uri;
+import android.util.Log;
 
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CallbackContext;
@@ -11,21 +12,26 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 
 /**
  * This class echoes a string called from JavaScript.
  */
 public class AudioRecorder extends CordovaPlugin {
-    private MP3Recorder recorder = new MP3Recorder();
+    private static final String TAG = AudioRecorder.class.getName();
+    private MP3Recorder recorder;
 
     @Override
-    public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
-        Toast.makeText(this.cordova.getActivity(), "AudioRecorder", Toast.LENGTH_SHORT).show();
-        if (action.equals("startRecord")) {
-            String optionsString = args.getString(0);
-            JSONObject options = new JSONObject(optionsString);
-
-            startRecord(options, callbackContext);
+    public boolean execute(String action, JSONArray args, CallbackContext callbackContext) {
+        if (action.equals("init")){
+            init(args, callbackContext);
+            return true;
+        } else if (action.equals("startRecord")) {
+            if(recorder == null){
+                callbackContext.error("audioRecorder has not been init yet!");
+                return true;
+            }
+            startRecord(callbackContext);
             return true;
         }else if(action.equals("stopRecord")) {
             stopRecord(callbackContext);
@@ -34,17 +40,24 @@ public class AudioRecorder extends CordovaPlugin {
         return false;
     }
 
-    private void coolMethod(String message, CallbackContext callbackContext) {
-        if (message != null && message.length() > 0) {
-            callbackContext.success(message);
-        } else {
-            callbackContext.error("Expected one non-empty string argument.");
+    private void init(JSONArray args, CallbackContext callbackContext){
+        try{
+            JSONObject options = args.getJSONObject(0);
+            if(recorder != null){
+                recorder.stopRecord();
+            }
+            recorder = new MP3Recorder(options, this.cordova.getActivity());
+        }catch (JSONException ex){
+            Log.e(TAG, ex.getMessage());
+            callbackContext.error(ex.getMessage());
+            return;
         }
+
+        callbackContext.success();
     }
 
-    private void startRecord(JSONObject options, CallbackContext callbackContext){
+    private void startRecord(CallbackContext callbackContext){
         try{
-            Toast.makeText(this.cordova.getActivity(), "start record", Toast.LENGTH_SHORT).show();
             recorder.startRecord();
             callbackContext.success();
         }catch (IOException ex){
@@ -56,7 +69,22 @@ public class AudioRecorder extends CordovaPlugin {
     private void stopRecord(CallbackContext callbackContext){
         recorder.stopRecord();
         File file = recorder.getFile();
-        Toast.makeText(this.cordova.getActivity(), file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
-        callbackContext.success(file.getAbsolutePath());
+        if(file != null){
+            Uri uri = Uri.fromFile(file);
+            JSONObject fileJson = new JSONObject();
+            try{
+                fileJson.put("name", file.getName());
+                fileJson.put("type", "audio/mpeg");
+                fileJson.put("uri", uri.toString());
+
+            }catch(JSONException ex){
+                Log.e(TAG, ex.getMessage());
+            }
+
+            callbackContext.success(fileJson);
+        }else{
+            callbackContext.success();
+        }
     }
+
 }
