@@ -34,6 +34,7 @@ public class MP3Recorder {
     private static final String OUT_BIT_RATE = "outBitRate";
     private static final String SAVE_DIRECTORY_NAME = "saveDirectoryName";
 
+    private String externalPath = Environment.getExternalStorageDirectory().getAbsolutePath();
     private AudioRecord audioRecord = null;
     private int bufferSize;
     private File mp3File;
@@ -47,6 +48,7 @@ public class MP3Recorder {
     private boolean isRecording = false;
     private int bitRate;
     private String directoryName;
+    private boolean isInit = false;
 
     public MP3Recorder(int samplingRate, int chanelConfig, PCMFormat audioFormat, int bitRate, String directoryName){
         this.samplingRate = samplingRate;
@@ -84,9 +86,7 @@ public class MP3Recorder {
 
     public void startRecord() throws IOException {
         if(!isRecording){
-            if(audioRecord == null){
-                initAudioRecord();
-            }
+            initAudioRecord();
             audioRecord.startRecording();
             new Thread(){
                 @Override
@@ -132,30 +132,32 @@ public class MP3Recorder {
     }
 
     private void initAudioRecord() throws IOException {
-        int bytesPreFrame = audioFormat.getBytesPerFrame();
-        int frameSize = AudioRecord.getMinBufferSize(DEFAULT_IN_SAMPLING_RATE, chanelConfig, audioFormat.getAudioFormat()) / bytesPreFrame;
-        if(frameSize % FRAME_COUNT != 0){
-            frameSize += FRAME_COUNT - frameSize % FRAME_COUNT;
+        if(!isInit){
+            int bytesPreFrame = audioFormat.getBytesPerFrame();
+            int frameSize = AudioRecord.getMinBufferSize(DEFAULT_IN_SAMPLING_RATE, chanelConfig, audioFormat.getAudioFormat()) / bytesPreFrame;
+            if(frameSize % FRAME_COUNT != 0){
+                frameSize += FRAME_COUNT - frameSize % FRAME_COUNT;
+            }
+
+            bufferSize = frameSize * bytesPreFrame / 2;
+            buffer = new short[bufferSize];
+            int result = SimpleLame.init(DEFAULT_IN_SAMPLING_RATE, 2, samplingRate, bitRate);
+            if(result < 0){
+                Log.e(TAG, "init SimpleLame:" + result);
+            }
+            isInit = true;
         }
 
-        bufferSize = frameSize * bytesPreFrame / 2;
-        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, DEFAULT_IN_SAMPLING_RATE, chanelConfig, audioFormat.getAudioFormat(), bufferSize);
-        ringBuffer = new RingBuffer(10 * bufferSize );
-        buffer = new short[bufferSize];
-
-        int result = SimpleLame.init(DEFAULT_IN_SAMPLING_RATE, 2, samplingRate, bitRate);
-        if(result < 0){
-            Log.e(TAG, "init SimpleLame:" + result);
-        }
-        String externalPath = Environment.getExternalStorageDirectory().getAbsolutePath();
         File directory = new File(externalPath + "/" + directoryName);
         if(!directory.exists()){
             directory.mkdir();
         }
 
+        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, DEFAULT_IN_SAMPLING_RATE, chanelConfig, audioFormat.getAudioFormat(), bufferSize);
         long millisecond = System.currentTimeMillis();
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss_SSSZ");
         String fileName = simpleDateFormat.format(new Date(millisecond)) + ".mp3";
+        ringBuffer = new RingBuffer(10 * bufferSize );
         mp3File = new File(directory, fileName);
         os = new FileOutputStream(mp3File);
         encodeThread = new DataEncodeThread(ringBuffer, os, bufferSize);
