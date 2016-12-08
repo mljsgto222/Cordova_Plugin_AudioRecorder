@@ -23,7 +23,24 @@
         <source-file src="src/android/PCMFormat.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder" />
         <source-file src="src/android/RingBuffer.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder" />
         <source-file src="src/android/SimpleLame.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder" />
-        <source-file src="src/android/libs/armeabi/libmp3lame.so" target-dir="libs/armeabi"></source-file>
-        <source-file src="src/android/libs/armeabi-v7a/libmp3lame.so" target-dir="libs/armeabi-v7a"></source-file>
+        <source-file src="src/android/libs/armeabi/libmp3lame.so" target-dir="libs/armeabi" />
+        <source-file src="src/android/libs/armeabi-v7a/libmp3lame.so" target-dir="libs/armeabi-v7a" />
+    </platform>
+    <platform name="ios">
+        <config-file parent="/*" target="config.xml">
+            <feature name="AudioRecorder">
+                <param name="ios-package" value="AudioRecorder" />
+            </feature>
+        </config-file>
+        <header-file src="src/ios/AudioRecorder.h"/>
+        <source-file src="src/ios/AudioRecorder.m" />
+        <header-file src="src/ios/lame.h" />
+        <header-file src="src/ios/SimpleLame.h" />
+        <source-file src="src/ios/SimpleLame.m" />
+
+        <framework src="AVFoundation.framework" />
+        <lib-file src="src/ios/libs/libmp3lame/libmp3lame-armv7.a" arch="ARM" />
+        <lib-file src="src/ios/libs/libmp3lame/libmp3lame-i386.a" arch="x86" />
+        <lib-file src="src/ios/libs/libmp3lame/libmp3lame-x86_64.a" arch="x64" />
     </platform>
 </plugin>
