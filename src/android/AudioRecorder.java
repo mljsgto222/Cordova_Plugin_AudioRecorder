@@ -12,26 +12,22 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 
 /**
  * This class echoes a string called from JavaScript.
  */
 public class AudioRecorder extends CordovaPlugin {
     private static final String TAG = AudioRecorder.class.getName();
+
+    private static final String OUT_SAMPLING_RATE = "outSamplingRate";
+    private static final String OUT_BIT_RATE = "outBitRate";
+
     private MP3Recorder recorder;
 
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) {
-        if (action.equals("init")){
-            init(args, callbackContext);
-            return true;
-        } else if (action.equals("startRecord")) {
-            if(recorder == null){
-                callbackContext.error("audioRecorder has not been init yet!");
-                return true;
-            }
-            startRecord(callbackContext);
+        if (action.equals("startRecord")) {
+            startRecord(args, callbackContext);
             return true;
         }else if(action.equals("stopRecord")) {
             stopRecord(callbackContext);
@@ -40,50 +36,56 @@ public class AudioRecorder extends CordovaPlugin {
         return false;
     }
 
-    private void init(JSONArray args, CallbackContext callbackContext){
-        try{
-            JSONObject options = args.getJSONObject(0);
-            if(recorder != null){
-                recorder.stopRecord();
+    private void startRecord(JSONArray args, CallbackContext callbackContext){
+            if(recorder == null || !recorder.isRecording()){
+                recorder = new MP3Recorder(this.cordova.getActivity());
+                if(!args.isNull(0)){
+                    try{
+                        JSONObject options = args.getJSONObject(0);
+                        if(options.has(OUT_SAMPLING_RATE)){
+                            recorder.setSamplingRate(options.getInt(OUT_SAMPLING_RATE));
+                        }
+                        if(options.has(OUT_BIT_RATE)){
+                            recorder.setBitRate(options.getInt(OUT_BIT_RATE));
+                        }
+                    }catch (JSONException ex){
+                        Log.e(TAG, ex.getMessage());
+                    }
+                }
+                try{
+                    recorder.startRecord();
+                    callbackContext.success();
+                }catch (IOException ex){
+                    Log.e(TAG, ex.getMessage());
+                    callbackContext.error(ex.getMessage());
+                }
+            }else if(recorder.isRecording()){
+                callbackContext.error("recorder has been start");
             }
-            recorder = new MP3Recorder(options, this.cordova.getActivity());
-        }catch (JSONException ex){
-            Log.e(TAG, ex.getMessage());
-            callbackContext.error(ex.getMessage());
-            return;
-        }
-
-        callbackContext.success();
-    }
-
-    private void startRecord(CallbackContext callbackContext){
-        try{
-            recorder.startRecord();
-            callbackContext.success();
-        }catch (IOException ex){
-            callbackContext.error(ex.getMessage());
-        }
-
     }
 
     private void stopRecord(CallbackContext callbackContext){
-        recorder.stopRecord();
-        File file = recorder.getFile();
-        if(file != null){
-            Uri uri = Uri.fromFile(file);
-            JSONObject fileJson = new JSONObject();
-            try{
-                fileJson.put("name", file.getName());
-                fileJson.put("type", "audio/mpeg");
-                fileJson.put("uri", uri.toString());
+        if(recorder != null){
+            recorder.stopRecord();
+            File file = recorder.getFile();
+            if(file != null){
+                Uri uri = Uri.fromFile(file);
+                JSONObject fileJson = new JSONObject();
+                try{
+                    fileJson.put("name", file.getName());
+                    fileJson.put("type", "audio/mpeg");
+                    fileJson.put("uri", uri.toString());
 
-            }catch(JSONException ex){
-                Log.e(TAG, ex.getMessage());
+                }catch(JSONException ex){
+                    Log.e(TAG, ex.getMessage());
+                }
+
+                callbackContext.success(fileJson);
+            }else{
+                callbackContext.error("record file not found");
             }
-
-            callbackContext.success(fileJson);
-        }else{
-            callbackContext.success();
+        } else {
+            callbackContext.error("has not recorded yet");
         }
     }
 
