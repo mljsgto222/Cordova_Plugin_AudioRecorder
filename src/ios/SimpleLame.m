@@ -4,15 +4,15 @@
 @implementation SimpleLame
 static lame_global_flags *glf = nil;
 
-+ (int)init:(int)samplerate outChannel:(int)outChannel outBitrate:(int)outBitRate{
++ (int)init:(int)inSamplerate outSamplerate:(int)outSamplerate outChannel:(int)outChannel outBitrate:(int)outBitRate{
     if(glf != nil){
         lame_close(glf);
         glf = nil;
     }
     glf = lame_init();
-    lame_set_in_samplerate(glf, samplerate);
+    lame_set_in_samplerate(glf, inSamplerate);
     lame_set_num_channels(glf, outChannel);
-    lame_set_out_samplerate(glf, samplerate);
+    lame_set_out_samplerate(glf, outSamplerate);
     lame_set_brate(glf, outBitRate);
     lame_set_quality(glf, 7);
     int result = lame_init_params(glf);

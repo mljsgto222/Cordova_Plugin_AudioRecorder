@@ -13,7 +13,6 @@
     int outSamplingRate;
 }
 
-- (void) init:(CDVInvokedUrlCommand*) command;
 - (void) startRecord:(CDVInvokedUrlCommand*) command;
 - (void) stopRecord:(CDVInvokedUrlCommand*) command;
 @end

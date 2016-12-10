@@ -4,14 +4,16 @@
 #import <AVFoundation/AVFoundation.h>
 
 #import "AudioRecorder.h"
+#import "SimpleLame.h"
 
 const int DEFAULT_OUT_BIT_RATE = 16;
-const int DEFAULT_OUT_SAMPLING_RATE = 44100.0;
+const int DEFAULT_OUT_SAMPLING_RATE = 44100;
+const int IN_SAMPLING_RATE = 44100;
 const int PCM_SIZE = 8192;
 
-const NSString *OUT_SAMPLING_RATE= @"outSamplingRate";
-const NSString *OUT_BIT_RATE = @"outBitRate";
-const NSString *TEMP_FILE_NAME = @"temp";
+NSString const *OUT_SAMPLING_RATE= @"outSamplingRate";
+NSString const *OUT_BIT_RATE = @"outBitRate";
+NSString const *TEMP_FILE_NAME = @"temp";
 
 @implementation AudioRecorder
 
@@ -19,39 +21,31 @@ const NSString *TEMP_FILE_NAME = @"temp";
     documentDirectory = NSTemporaryDirectory();
     outSamplingRate = DEFAULT_OUT_SAMPLING_RATE;
     outBitRate = DEFAULT_OUT_BIT_RATE;
-}
-
-- (void) init:(CDVInvokedUrlCommand*)command
-{
-    CDVPluginResult *pluginResult = nil;
-    
     setting = [NSDictionary dictionaryWithObjectsAndKeys:
-                             [NSNumber numberWithInt:kAudioFormatLinearPCM], AVFormatIDKey,
-                             [NSNumber numberWithInt:44100], AVSampleRateKey,
-                             [NSNumber numberWithInt:AVAudioQualityMedium], AVEncoderAudioQualityKey,
-                             nil];
-    NSDictionary *options = [command.arguments objectAtIndex:0];
-    if(options != nil){
-        if([options objectForKey:OUT_SAMPLING_RATE] != nil){
-            [setting setValue:[options objectForKey:OUT_SAMPLING_RATE] forKey:AVSampleRateKey];
-            outSamplingRate = (int)[options objectForKey:OUT_SAMPLING_RATE];
-        }
-        if([options objectForKey: OUT_BIT_RATE] != nil){
-            [setting setValue:[options objectForKey:OUT_BIT_RATE] forKey:AVEncoderBitRateKey];
-            outBitRate = (int)[options objectForKey:OUT_BIT_RATE];
-        }
-    }
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+               [NSNumber numberWithInt:kAudioFormatLinearPCM], AVFormatIDKey,
+               [NSNumber numberWithInt:IN_SAMPLING_RATE], AVSampleRateKey,
+               [NSNumber numberWithInt:AVAudioQualityMedium], AVEncoderAudioQualityKey,
+               nil];
+
 }
 
 - (void) startRecord:(CDVInvokedUrlCommand *)command
 {
     CDVPluginResult *pluginResult = nil;
-    if(setting == nil){
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"audioRecorder has not been init yet!"];
+    if([recorder isRecording]){
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"AudioRecorder has already in record"];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
         return;
+    }
+    
+    NSDictionary *options = [command.arguments objectAtIndex:0];
+    if(options != nil){
+        if([options valueForKey:OUT_SAMPLING_RATE] != nil){
+            outSamplingRate = [[options valueForKey:OUT_SAMPLING_RATE] intValue];
+        }
+        if([options valueForKey: OUT_BIT_RATE] != nil){
+            outBitRate = [[options valueForKey:OUT_BIT_RATE] intValue];
+        }
     }
     
     AVAudioSession *audioSession = [AVAudioSession sharedInstance];
@@ -130,7 +124,7 @@ const NSString *TEMP_FILE_NAME = @"temp";
         int mp3Size = (int)(PCM_SIZE);
         unsigned char mp3Buffer[mp3Size];
         
-        int result = [SimpleLame init:outSamplingRate outChannel:1 outBitrate:outBitRate];
+        int result = [SimpleLame init:IN_SAMPLING_RATE outSamplerate:outSamplingRate outChannel:1 outBitrate:outBitRate];
         if(result >= 0){
             do{
                 read = fread(pcmBuffer, 2 * sizeof(short int), PCM_SIZE, pcm);
@@ -159,10 +153,10 @@ const NSString *TEMP_FILE_NAME = @"temp";
     }
 }
 
-- (void)convertMp3Finished:(id *)status
+- (void)convertMp3Finished:(NSNumber *)status
 {
     CDVPluginResult *pluginResult;
-    if(status >= 0){
+    if([status intValue] >= 0){
         NSString *mp3FileName = [NSString stringWithFormat:@"%@.mp3", TEMP_FILE_NAME];
         NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
                                 mp3FileName, @"name",

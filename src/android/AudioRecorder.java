@@ -60,7 +60,7 @@ public class AudioRecorder extends CordovaPlugin {
                     callbackContext.error(ex.getMessage());
                 }
             }else if(recorder.isRecording()){
-                callbackContext.error("recorder has been start");
+                callbackContext.error("AudioRecorder has already in record");
             }
     }
 
@@ -85,7 +85,7 @@ public class AudioRecorder extends CordovaPlugin {
                 callbackContext.error("record file not found");
             }
         } else {
-            callbackContext.error("has not recorded yet");
+            callbackContext.error("AudioRecorder has not recorded yet");
         }
     }
 

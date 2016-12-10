@@ -130,7 +130,7 @@ public class MP3Recorder {
         }
         audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, DEFAULT_IN_SAMPLING_RATE, chanelConfig, audioFormat.getAudioFormat(), bufferSize);
         ringBuffer = new RingBuffer(10 * bufferSize );
-        mp3File = File.createTempFile("temp", "mp3", cacheDir);
+        mp3File = File.createTempFile("temp", ".mp3", cacheDir);
         os = new FileOutputStream(mp3File);
         encodeThread = new DataEncodeThread(ringBuffer, os, bufferSize);
         encodeThread.start();

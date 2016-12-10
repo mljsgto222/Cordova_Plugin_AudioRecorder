@@ -38,9 +38,10 @@
         <header-file src="src/ios/SimpleLame.h" />
         <source-file src="src/ios/SimpleLame.m" />
 
+        <source-file src="src/ios/libs/libmp3lame/libmp3lame-armv7.a" framework="true" />
+        <source-file src="src/ios/libs/libmp3lame/libmp3lame-i386.a" framework="true" />
+        <source-file src="src/ios/libs/libmp3lame/libmp3lame-x86_64.a" framework="true" />
+
         <framework src="AVFoundation.framework" />
-        <lib-file src="src/ios/libs/libmp3lame/libmp3lame-armv7.a" arch="ARM" />
-        <lib-file src="src/ios/libs/libmp3lame/libmp3lame-i386.a" arch="x86" />
-        <lib-file src="src/ios/libs/libmp3lame/libmp3lame-x86_64.a" arch="x64" />
     </platform>
 </plugin>
