@@ -24,7 +24,8 @@ NSString const *TEMP_FILE_NAME = @"temp";
     setting = [NSDictionary dictionaryWithObjectsAndKeys:
                [NSNumber numberWithInt:kAudioFormatLinearPCM], AVFormatIDKey,
                [NSNumber numberWithInt:IN_SAMPLING_RATE], AVSampleRateKey,
-               [NSNumber numberWithInt:AVAudioQualityMedium], AVEncoderAudioQualityKey,
+               [NSNumber numberWithInt:16], AVLinearPCMBitDepthKey,
+               [NSNumber numberWithInt:2], AVNumberOfChannelsKey,
                nil];
 
 }
@@ -56,6 +57,8 @@ NSString const *TEMP_FILE_NAME = @"temp";
         [self sendErrorResult:error callbackId:command.callbackId];
         return;
     }
+    error = nil;
+    [audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
     error = nil;
     [audioSession setActive:YES error:&error];
     if(error != nil){
@@ -104,8 +107,6 @@ NSString const *TEMP_FILE_NAME = @"temp";
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }
-    
-    
 }
 
 - (void) convertMp3

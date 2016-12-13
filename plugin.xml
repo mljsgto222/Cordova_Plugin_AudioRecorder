@@ -32,15 +32,19 @@
                 <param name="ios-package" value="AudioRecorder" />
             </feature>
         </config-file>
+        <config-file target="*-Info.plist" parent="NSMicrophoneUsageDescription">
+            <string></string>
+         </config-file>
         <header-file src="src/ios/AudioRecorder.h"/>
         <source-file src="src/ios/AudioRecorder.m" />
         <header-file src="src/ios/lame.h" />
         <header-file src="src/ios/SimpleLame.h" />
         <source-file src="src/ios/SimpleLame.m" />
 
-        <source-file src="src/ios/libs/libmp3lame/libmp3lame-armv7.a" framework="true" />
+        <source-file src="src/ios/libs/libmp3lame/libmp3lame.a" framework="true" />        
+        <!--<source-file src="src/ios/libs/libmp3lame/libmp3lame-armv7.a" framework="true" />
         <source-file src="src/ios/libs/libmp3lame/libmp3lame-i386.a" framework="true" />
-        <source-file src="src/ios/libs/libmp3lame/libmp3lame-x86_64.a" framework="true" />
+        <source-file src="src/ios/libs/libmp3lame/libmp3lame-x86_64.a" framework="true" />-->
 
         <framework src="AVFoundation.framework" />
     </platform>
