@@ -3,15 +3,24 @@
 
 @interface AudioRecorder : CDVPlugin <AVAudioRecorderDelegate>{
   // Member variables go here.
+    AVAudioSession *avSession;
     AVAudioRecorder *recorder;
     NSDictionary *setting;
-    NSString *recordPath;
+    NSString *resourcePath;
     NSString *documentDirectory;
     NSString *stopRecordCallbackId;
 
     int outBitRate;
     int outSamplingRate;
 }
+
+@property (nonatomic, strong) AVAudioSession* avSession;
+@property (nonatomic, strong) AVAudioRecorder* recorder;
+@property (nonatomic, strong) NSString* resourcePath;
+@property (nonatomic, strong) NSString* documentDirectory;
+@property (nonatomic, strong) NSDictionary* setting;
+@property (nonatomic) int outBitRate;
+@property (nonatomic) int outSampingRate;
 
 - (void) startRecord:(CDVInvokedUrlCommand*) command;
 - (void) stopRecord:(CDVInvokedUrlCommand*) command;

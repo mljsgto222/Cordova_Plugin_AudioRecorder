@@ -6,16 +6,18 @@
 #import "AudioRecorder.h"
 #import "SimpleLame.h"
 
-const int DEFAULT_OUT_BIT_RATE = 16;
-const int DEFAULT_OUT_SAMPLING_RATE = 44100;
-const int IN_SAMPLING_RATE = 44100;
-const int PCM_SIZE = 8192;
+#define DEFAULT_OUT_BIT_RATE 16
+#define DEFAULT_OUT_SAMPLING_RATE 44100
+#define IN_SAMPLING_RATE 44100
+#define PCM_SIZE 8192
 
-NSString const *OUT_SAMPLING_RATE= @"outSamplingRate";
-NSString const *OUT_BIT_RATE = @"outBitRate";
-NSString const *TEMP_FILE_NAME = @"temp";
+#define OUT_SAMPLING_RATE @"outSamplingRate"
+#define OUT_BIT_RATE @"outBitRate"
+#define TEMP_FILE_NAME @"temp"
+
 
 @implementation AudioRecorder
+@synthesize setting, avSession, documentDirectory, recorder, resourcePath, outBitRate, outSampingRate;
 
 - (void) pluginInitialize{
     documentDirectory = NSTemporaryDirectory();
@@ -32,13 +34,12 @@ NSString const *TEMP_FILE_NAME = @"temp";
 
 - (void) startRecord:(CDVInvokedUrlCommand *)command
 {
-    CDVPluginResult *pluginResult = nil;
     if([recorder isRecording]){
+        CDVPluginResult *pluginResult = nil;
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"AudioRecorder has already in record"];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
         return;
     }
-    
     NSDictionary *options = [command.arguments objectAtIndex:0];
     if(options != nil){
         if([options valueForKey:OUT_SAMPLING_RATE] != nil){
@@ -49,115 +50,159 @@ NSString const *TEMP_FILE_NAME = @"temp";
         }
     }
     
-    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
-    NSError *error;
-    [audioSession setCategory:AVAudioSessionCategoryRecord error:&error];
-    if(error != nil){
-        NSLog(@"audioSession error: %@", [[error userInfo] description]);
-        [self sendErrorResult:error callbackId:command.callbackId];
-        return;
-    }
-    error = nil;
-    [audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
-    error = nil;
-    [audioSession setActive:YES error:&error];
-    if(error != nil){
-        NSLog(@"audioSession error: %@", [[error userInfo] description]);
-        [self sendErrorResult:error callbackId:command.callbackId];
-        return;
+    __weak AudioRecorder* recorderSelf = self;
+    __weak NSString* weakCallbackId = [command callbackId];
+    
+    void (^startRecording)(void) = ^{
+        __strong  AudioRecorder* audioRecorder = recorderSelf;
+        __strong NSString* callbackId = weakCallbackId;
+        CDVPluginResult *pluginResult = nil;
+        NSError* __autoreleasing error = nil;
+        
+        if(audioRecorder.recorder != nil){
+            [audioRecorder.recorder stop];
+            audioRecorder.recorder = nil;
+        }
+        
+        if([audioRecorder hasAvSession]){
+            if(![audioRecorder.avSession.category isEqualToString:AVAudioSessionCategoryPlayAndRecord]){
+                [audioRecorder.avSession setCategory:AVAudioSessionCategoryRecord error:nil];
+            }
+
+            if(![audioRecorder.avSession setActive:YES error:&error]){
+                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: [NSString stringWithFormat:@"Unable to record audio: %@", [[error userInfo] description]]];
+                [audioRecorder.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+                return;
+            }
+        }
+        
+        audioRecorder.resourcePath = [audioRecorder.documentDirectory stringByAppendingFormat:@"%@.pcm", TEMP_FILE_NAME];
+        NSURL *url = [NSURL URLWithString:audioRecorder.resourcePath];
+        audioRecorder.recorder = [[AVAudioRecorder alloc] initWithURL:url settings:audioRecorder.setting error:&error];
+        
+        bool recordingSuccess = NO;
+        if (error == nil){
+            audioRecorder.recorder.delegate = audioRecorder;
+            audioRecorder.recorder.meteringEnabled = YES;
+            recordingSuccess = [audioRecorder.recorder record];
+            
+            if(recordingSuccess){
+                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+                [audioRecorder.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+                return;
+            }
+        }
+        
+        if(error != nil || !recordingSuccess){
+            if(error != nil){
+                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: [NSString stringWithFormat: @"Failed to initialize AvAudioRecorder: %@", [[error userInfo] description]]];
+            }else{
+                pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Failed to start recording"];
+            }
+            audioRecorder.recorder = nil;
+            if([audioRecorder hasAvSession]){
+                [audioRecorder.avSession setActive:NO error:nil];
+            }
+            [audioRecorder.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+            return;
+        }
+    };
+    
+    SEL rrpSel = NSSelectorFromString(@"requestRecordPermission:");
+    if([self hasAvSession] && [self.avSession respondsToSelector:rrpSel]){
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        [self.avSession performSelector:rrpSel withObject:^(BOOL granted){
+            __strong AudioRecorder* audioRecorder = recorderSelf;
+            __strong NSString* callbackId = weakCallbackId;
+            if(granted){
+                startRecording();
+            } else {
+                audioRecorder.recorder = nil;
+                if([audioRecorder hasAvSession]){
+                    [audioRecorder.avSession setActive:NO error:nil];
+                }
+                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Microphone permission denied."];
+                [audioRecorder.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+            }
+        }];
+#pragma clang diagnostic pop
+    }else{
+        startRecording();
     }
     
-    NSString *fileName = [NSString stringWithFormat:@"%@.pcm", TEMP_FILE_NAME];
-    recordPath = [documentDirectory stringByAppendingPathComponent:fileName];
-    NSURL *url = [NSURL fileURLWithPath:recordPath];
-    error = nil;
-    recorder = [[AVAudioRecorder alloc] initWithURL:url settings:setting error:&error];
-    if(recorder == nil){
-        NSLog(@"AVAudioRecorder error: %@", [[error userInfo] description]);
-        [self sendErrorResult:error callbackId:command.callbackId];
-        return;
-    }
-    
-    [recorder setDelegate:self];
-    [recorder prepareToRecord];
-    recorder.meteringEnabled = YES;
-    
-    BOOL audioAvailable = audioSession.isInputAvailable;
-    if(!audioAvailable){
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"audio input hardware not available"];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-        return;
-    }
-    
-    [recorder record];
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void) stopRecord:(CDVInvokedUrlCommand *)command
 {
-    CDVPluginResult *pluginResult;
+    stopRecordCallbackId = command.callbackId;
     if(recorder != nil){
         [recorder stop];
-    }
-    if(recordPath != nil){
-        [NSThread detachNewThreadSelector:@selector(convertMp3) toTarget:self withObject:nil];
-        stopRecordCallbackId = command.callbackId;
-    }else{
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        recorder = nil;
     }
 }
 
-- (void) convertMp3
+- (void) audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag
 {
-    NSString *mp3FileName = [NSString stringWithFormat:@"%@.mp3", TEMP_FILE_NAME];
-    NSString *mp3FilePath = [documentDirectory stringByAppendingPathComponent:mp3FileName];
-    int status;
-    @try{
-        int read, write;
-        
-        FILE *pcm = fopen([recordPath cStringUsingEncoding:1], "rb");
-        fseek(pcm, 4 * 1024, SEEK_CUR);
-        FILE *mp3 = fopen([mp3FilePath cStringUsingEncoding:1], "wb");
-        
-        short int pcmBuffer[PCM_SIZE * 2];
-        int mp3Size = (int)(PCM_SIZE);
-        unsigned char mp3Buffer[mp3Size];
-        
-        int result = [SimpleLame init:IN_SAMPLING_RATE outSamplerate:outSamplingRate outChannel:1 outBitrate:outBitRate];
-        if(result >= 0){
-            do{
-                read = fread(pcmBuffer, 2 * sizeof(short int), PCM_SIZE, pcm);
-                if(read == 0){
-                    write = [SimpleLame flush:mp3Buffer mp3bufSize:mp3Size];
-                }else{
-                    write = [SimpleLame encode:pcmBuffer samples: read mp3buf:mp3Buffer mp3bufSize:mp3Size];
+    if(flag){
+        __weak AudioRecorder* weakRecorder = self;
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(void){
+            __strong AudioRecorder* audioRecorder = weakRecorder;
+            if(audioRecorder){
+                NSString *mp3FilePath = [audioRecorder.documentDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.mp3", TEMP_FILE_NAME]];
+                BOOL convertMp3Success = NO;
+                @try{
+                    int read, write;
+                    
+                    FILE *mp3File = fopen([mp3FilePath cStringUsingEncoding:1], "wb");
+                    FILE *pcmFile = fopen([audioRecorder.resourcePath cStringUsingEncoding:1], "rb");
+                    fseek(pcmFile, 4 * 1024, SEEK_CUR);
+                    
+                    short int pcmBuffer[PCM_SIZE *2];
+                    unsigned char mp3Buffer[PCM_SIZE];
+                    
+                    int result = [SimpleLame init:IN_SAMPLING_RATE outSamplerate:audioRecorder.outSampingRate outChannel:1 outBitrate:audioRecorder.outBitRate];
+                    if(result >= 0){
+                        do{
+                            read = fread(pcmBuffer, 2 * sizeof(short int), PCM_SIZE, pcmFile);
+                            if(read == 0){
+                                write = [SimpleLame flush:mp3Buffer mp3bufSize:PCM_SIZE];
+                            }else{
+                                write = [SimpleLame encode:pcmBuffer samples: read mp3buf:mp3Buffer mp3bufSize:PCM_SIZE];
+                            }
+                            if(write >= 0){
+                                fwrite(mp3Buffer, write, 1, mp3File);
+                            }
+
+                        } while (read != 0);
+                        [SimpleLame close];
+                        fclose(mp3File);
+                        fclose(pcmFile);
+                        convertMp3Success = YES;
+                    }
                 }
-                if(write >= 0){
-                    fwrite(mp3Buffer, write, 1, mp3);
+                @catch(NSException *ex){
+                    NSLog(@"Failed to converting audio: %@", [[ex userInfo] description]);
                 }
-            } while (read != 0);
-            
-            [SimpleLame close];
-            fclose(mp3);
-            fclose(pcm);
-            status = 0;
-        }
+                @finally{
+                    [audioRecorder convertMp3Finished: convertMp3Success];
+                }
+            }
+        });
+    }else{
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Failed to encoding audio"];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:stopRecordCallbackId];
     }
-    @catch (NSException *ex){
-        NSLog(@"%@", [ex description]);
-        status = -1;
-    }
-    @finally{
-        [self performSelectorOnMainThread:@selector(convertMp3Finished:) withObject: [NSNumber numberWithInt:status] waitUntilDone:YES];
+    
+    if([self hasAvSession]){
+        [self.avSession setActive:NO error:nil];
     }
 }
 
-- (void)convertMp3Finished:(NSNumber *)status
+- (void)convertMp3Finished:(BOOL)flag
 {
     CDVPluginResult *pluginResult;
-    if([status intValue] >= 0){
+    if(flag){
         NSString *mp3FileName = [NSString stringWithFormat:@"%@.mp3", TEMP_FILE_NAME];
         NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
                                 mp3FileName, @"name",
@@ -166,18 +211,27 @@ NSString const *TEMP_FILE_NAME = @"temp";
                                 nil];
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:result];
     }else{
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"convert to mp3 failed"];
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Failed to converting mp3"];
     }
     
     [self.commandDelegate sendPluginResult:pluginResult callbackId:stopRecordCallbackId];
     
 }
 
-- (void) sendErrorResult:(NSError*)error callbackId:(NSString*)callbackId
+- (BOOL) hasAvSession
 {
-    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[NSString stringWithFormat:@"%@ %ld %@", [error domain], [error code], [[error userInfo] description]]];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+    BOOL hasSession = YES;
+    if(avSession == nil){
+        NSError *error = nil;
+        
+        avSession = [AVAudioSession sharedInstance];
+        if(error != nil){
+            NSLog(@"get AvAudioSession failed: %@", [[error userInfo] description]);
+            avSession = nil;
+            hasSession = NO;
+        }
+    }
+    return hasSession;
 }
-
 
 @end
