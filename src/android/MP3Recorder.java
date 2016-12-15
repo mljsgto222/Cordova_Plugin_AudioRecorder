@@ -12,6 +12,7 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Date;
 
 /**
  * Created by zhengz on 16/11/24.
@@ -38,6 +39,8 @@ public class MP3Recorder {
     private PCMFormat audioFormat;
     private boolean isRecording = false;
     private int bitRate;
+    private long startRecordTime;
+    private long endRecordTime;
 
     public MP3Recorder(Context context){
         this.samplingRate = DEFAULT_SAMPLING_RATE;
@@ -71,9 +74,11 @@ public class MP3Recorder {
                 initAudioRecord();
             }
             audioRecord.startRecording();
+            startRecordTime = (new Date()).getTime();
             new Thread(){
                 @Override
                 public void run() {
+
                     isRecording = true;
                     while (isRecording){
                         int bytes = audioRecord.read(buffer, 0, bufferSize);
@@ -109,6 +114,11 @@ public class MP3Recorder {
 
     public void stopRecord(){
         isRecording = false;
+        endRecordTime = (new Date()).getTime();
+    }
+
+    public double getDuration(){
+        return Math.round((double)(endRecordTime - startRecordTime) / 100.0) / 10.0;
     }
 
     public File getFile(){
@@ -122,19 +132,27 @@ public class MP3Recorder {
             frameSize += FRAME_COUNT - frameSize % FRAME_COUNT;
         }
 
-        bufferSize = frameSize * bytesPreFrame / 2;
+        bufferSize = frameSize * bytesPreFrame;
         buffer = new short[bufferSize];
         int result = SimpleLame.init(DEFAULT_IN_SAMPLING_RATE, 2, samplingRate, bitRate);
         if(result < 0){
             Log.e(TAG, "init SimpleLame:" + result);
         }
         audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, DEFAULT_IN_SAMPLING_RATE, chanelConfig, audioFormat.getAudioFormat(), bufferSize);
-        ringBuffer = new RingBuffer(10 * bufferSize );
-        mp3File = File.createTempFile("temp", ".mp3", cacheDir);
-        os = new FileOutputStream(mp3File);
-        encodeThread = new DataEncodeThread(ringBuffer, os, bufferSize);
-        encodeThread.start();
-        audioRecord.setRecordPositionUpdateListener(encodeThread);
-        audioRecord.setPositionNotificationPeriod(FRAME_COUNT);
+        int state = audioRecord.getState();
+        if(state == AudioRecord.STATE_INITIALIZED){
+            ringBuffer = new RingBuffer(10 * bufferSize );
+            mp3File = File.createTempFile("temp", ".mp3", cacheDir);
+            os = new FileOutputStream(mp3File);
+            encodeThread = new DataEncodeThread(ringBuffer, os, bufferSize);
+            encodeThread.start();
+            audioRecord.setRecordPositionUpdateListener(encodeThread);
+            audioRecord.setPositionNotificationPeriod(FRAME_COUNT);
+        }else {
+            audioRecord.release();
+        }
+
+
+
     }
 }

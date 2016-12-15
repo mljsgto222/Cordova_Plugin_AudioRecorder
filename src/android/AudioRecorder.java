@@ -75,6 +75,7 @@ public class AudioRecorder extends CordovaPlugin {
                     fileJson.put("name", file.getName());
                     fileJson.put("type", "audio/mpeg");
                     fileJson.put("uri", uri.toString());
+                    fileJson.put("duration", recorder.getDuration());
 
                 }catch(JSONException ex){
                     Log.e(TAG, ex.getMessage());
