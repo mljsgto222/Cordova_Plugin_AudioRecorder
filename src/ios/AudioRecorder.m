@@ -155,7 +155,10 @@
     }
     
     if([self hasAvSession]){
-        [self.avSession setActive:NO error:nil];
+        if(![avSession.category isEqualToString:AVAudioSessionCategoryAmbient]){
+            [self.avSession setCategory:AVAudioSessionCategoryAmbient error:nil];
+        }
+        [self.avSession setActive:NO error: nil];
     }
     isRecording = NO;
     endRecordTime = CACurrentMediaTime();
