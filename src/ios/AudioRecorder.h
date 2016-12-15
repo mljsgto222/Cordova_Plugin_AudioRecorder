@@ -12,6 +12,9 @@
 
     int outBitRate;
     int outSamplingRate;
+    CFTimeInterval startRecordTime;
+    CFTimeInterval endRecordTime;
+    BOOL isRecording;
 }
 
 @property (nonatomic, strong) AVAudioSession* avSession;
@@ -21,6 +24,7 @@
 @property (nonatomic, strong) NSDictionary* setting;
 @property (nonatomic) int outBitRate;
 @property (nonatomic) int outSampingRate;
+@property (nonatomic) BOOL isRecording;
 
 - (void) startRecord:(CDVInvokedUrlCommand*) command;
 - (void) stopRecord:(CDVInvokedUrlCommand*) command;

@@ -90,6 +90,7 @@
                 pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
                 [audioRecorder.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
                 isRecording = YES;
+                startRecordTime = CACurrentMediaTime();
                 [NSTimer scheduledTimerWithTimeInterval:.2 target:self selector:@selector(convertMp3) userInfo:nil repeats:NO];
                 return;
             }
@@ -157,6 +158,7 @@
         [self.avSession setActive:NO error:nil];
     }
     isRecording = NO;
+    endRecordTime = CACurrentMediaTime();
 }
 
 - (void)convertMp3
@@ -239,6 +241,7 @@
                                 mp3FileName, @"name",
                                 @"audio/mpeg", @"type",
                                 [documentDirectory stringByAppendingPathComponent:mp3FileName], @"uri",
+                                [NSString stringWithFormat:@"%.2g", endRecordTime - startRecordTime ], @"duration",
                                 nil];
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:result];
     }else{
