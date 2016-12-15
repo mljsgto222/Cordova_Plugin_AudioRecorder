@@ -17,7 +17,7 @@
 
 
 @implementation AudioRecorder
-@synthesize setting, avSession, documentDirectory, recorder, resourcePath, outBitRate, outSampingRate;
+@synthesize setting, avSession, documentDirectory, recorder, resourcePath, outBitRate, outSampingRate, isRecording;
 
 - (void) pluginInitialize{
     documentDirectory = NSTemporaryDirectory();
@@ -89,6 +89,8 @@
             if(recordingSuccess){
                 pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
                 [audioRecorder.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+                isRecording = YES;
+                [NSTimer scheduledTimerWithTimeInterval:.2 target:self selector:@selector(convertMp3) userInfo:nil repeats:NO];
                 return;
             }
         }
@@ -145,50 +147,7 @@
 - (void) audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag
 {
     if(flag){
-        __weak AudioRecorder* weakRecorder = self;
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(void){
-            __strong AudioRecorder* audioRecorder = weakRecorder;
-            if(audioRecorder){
-                NSString *mp3FilePath = [audioRecorder.documentDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.mp3", TEMP_FILE_NAME]];
-                BOOL convertMp3Success = NO;
-                @try{
-                    int read, write;
-                    
-                    FILE *mp3File = fopen([mp3FilePath cStringUsingEncoding:1], "wb");
-                    FILE *pcmFile = fopen([audioRecorder.resourcePath cStringUsingEncoding:1], "rb");
-                    fseek(pcmFile, 4 * 1024, SEEK_CUR);
-                    
-                    short int pcmBuffer[PCM_SIZE *2];
-                    unsigned char mp3Buffer[PCM_SIZE];
-                    
-                    int result = [SimpleLame init:IN_SAMPLING_RATE outSamplerate:audioRecorder.outSampingRate outChannel:1 outBitrate:audioRecorder.outBitRate];
-                    if(result >= 0){
-                        do{
-                            read = fread(pcmBuffer, 2 * sizeof(short int), PCM_SIZE, pcmFile);
-                            if(read == 0){
-                                write = [SimpleLame flush:mp3Buffer mp3bufSize:PCM_SIZE];
-                            }else{
-                                write = [SimpleLame encode:pcmBuffer samples: read mp3buf:mp3Buffer mp3bufSize:PCM_SIZE];
-                            }
-                            if(write >= 0){
-                                fwrite(mp3Buffer, write, 1, mp3File);
-                            }
-
-                        } while (read != 0);
-                        [SimpleLame close];
-                        fclose(mp3File);
-                        fclose(pcmFile);
-                        convertMp3Success = YES;
-                    }
-                }
-                @catch(NSException *ex){
-                    NSLog(@"Failed to converting audio: %@", [[ex userInfo] description]);
-                }
-                @finally{
-                    [audioRecorder convertMp3Finished: convertMp3Success];
-                }
-            }
-        });
+        
     }else{
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Failed to encoding audio"];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:stopRecordCallbackId];
@@ -197,6 +156,78 @@
     if([self hasAvSession]){
         [self.avSession setActive:NO error:nil];
     }
+    isRecording = NO;
+}
+
+- (void)convertMp3
+{
+    __weak AudioRecorder* weakRecorder = self;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(void){
+        __strong AudioRecorder* audioRecorder = weakRecorder;
+        if(audioRecorder){
+            NSString *mp3FilePath = [audioRecorder.documentDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.mp3", TEMP_FILE_NAME]];
+            BOOL convertMp3Success = NO;
+            @try{
+                int read, write;
+                
+                FILE *mp3File = fopen([mp3FilePath cStringUsingEncoding:1], "wb");
+                FILE *pcmFile = fopen([audioRecorder.resourcePath cStringUsingEncoding:1], "rb");
+                
+                short int pcmBuffer[PCM_SIZE *2];
+                unsigned char mp3Buffer[PCM_SIZE];
+                
+                [SimpleLame init:IN_SAMPLING_RATE outSamplerate:audioRecorder.outSampingRate outChannel:1 outBitrate:audioRecorder.outBitRate];
+                
+                long curPos;
+                BOOL hasSkipHeader = NO;
+                
+                do{
+                    curPos = ftell(pcmFile);
+                    long startPos = ftell(pcmFile);
+                    
+                    fseek(pcmFile, 0, SEEK_END);
+                    long endPos = ftell(pcmFile);
+                    
+                    long length = endPos - startPos;
+                    fseek(pcmFile, curPos, SEEK_SET);
+                    
+                    if(length > PCM_SIZE * 2 * sizeof(short int)){
+                        if(!hasSkipHeader){
+                            fseek(pcmFile, 4 * 1024, SEEK_SET);
+                            hasSkipHeader = YES;
+                        }
+                        
+                        read = fread(pcmBuffer, 2 * sizeof(short int), PCM_SIZE, pcmFile);
+                        write = [SimpleLame encode:pcmBuffer samples: read mp3buf:mp3Buffer mp3bufSize:PCM_SIZE];
+                        if(write >= 0){
+                            fwrite(mp3Buffer, write, 1, mp3File);
+                        }
+                    }
+                } while (audioRecorder.isRecording);
+                do{
+                    read = fread(pcmBuffer, 2 * sizeof(short int), PCM_SIZE, pcmFile);
+                    if(read == 0){
+                        write = [SimpleLame flush:mp3Buffer mp3bufSize:PCM_SIZE];
+                    }else{
+                        write = [SimpleLame encode:pcmBuffer samples: read mp3buf:mp3Buffer mp3bufSize:PCM_SIZE];
+                    }
+                }while (read != 0);
+                
+                
+                [SimpleLame close];
+                fclose(mp3File);
+                fclose(pcmFile);
+                convertMp3Success = YES;
+            
+            }
+            @catch(NSException *ex){
+                NSLog(@"Failed to converting audio: %@", [[ex userInfo] description]);
+            }
+            @finally{
+                [audioRecorder convertMp3Finished: convertMp3Success];
+            }
+        }
+    });
 }
 
 - (void)convertMp3Finished:(BOOL)flag
