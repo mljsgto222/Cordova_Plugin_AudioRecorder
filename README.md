@@ -1,6 +1,6 @@
 # Cordova_Plugin_AudioRecorder
 
-This is a cordova plugin for take audio record. And the record will be compressed into MP3 format.
+This is a cordova plugin for audio recording. And the record will be compressed into MP3 format by [LAME](http://lame.sourceforge.net/index.php).
 
 ## Supported Platforms
 
@@ -9,15 +9,13 @@ This is a cordova plugin for take audio record. And the record will be compresse
 
 ## Usage
 
-### Samplingrates
+### Constants
 
-```
-AudioRecorder.AUDIO_SAMPLINGS = {
-    MAX: 44100,
-    NORMAL: 22050,
-    LOW: 8000
-}
-```
+- `AudioRecorder.MAX`           = 1
+- `AudioRecorder.NORMAL`        = 2
+- `AudioRecorder.LOW`           = 3
+
+__NOTE__: The transformation of mp3 files by LAME may fail when using other samplingrates.
 
 ### Start Record
 
@@ -26,8 +24,8 @@ AudioRecorder.startRecord(options, success, error);
 ```
 
 - __options__: recorder settings
-    - `outSamplingRate`: set sampling rate for output mp3. _default: 22050_(note: lame convert mp3 may failed when use other samplingrates.)(_number_)
-    - `outBitRate`: set bit rate for output mp3. _default: 16_(_number_)
+    - `outSamplingRate`: set sampling rate for output mp3. _default: 22050(_number_)
+    - `outBitRate`: set bit rate for output mp3. _default: 16(_number_)
 
 - __success__: startRecord success callback.
 
@@ -52,6 +50,7 @@ AudioRecorder.stopRecord(success, error)
 ## Reference
 
 [AndroidMp3Recorder](https://github.com/telescreen/AndroidMp3Recorder)
+[cordova-plugin-media](https://cordova.apache.org/docs/en/latest/reference/cordova-plugin-media/)
 
 ## License
 
