@@ -39,13 +39,18 @@ AudioRecorder.stopRecord(success, error)
 ```
 
 - __success__: stopRecord success callback.
-    - `file`: output mp3 file object
+    - `file`: output mp3 file object(This is a temporary file on device)
         - `name`: mp3 file's name.(_string_)
         - `type`: `'audio/mpeg'`(_string_)
         - `uri`: file local uri(_string_)
 
 - __error__: stopRecord error callback
     - 'errorMessage': a string about error(_string_)
+
+## TODO LIST
+
+- Set duration for audio recording. 
+- Save record in device storage.
 
 ## Reference
 
