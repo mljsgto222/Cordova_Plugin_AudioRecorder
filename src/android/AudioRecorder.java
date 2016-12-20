@@ -60,7 +60,7 @@ public class AudioRecorder extends CordovaPlugin {
                     callbackContext.error(ex.getMessage());
                 }
             }else if(recorder.isRecording()){
-                callbackContext.error("AudioRecorder has already in record");
+                callbackContext.success();
             }
     }
 
