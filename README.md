@@ -51,6 +51,7 @@ AudioRecorder.stopRecord(success, error)
 
 - Set duration for audio recording. 
 - Save record in device storage.
+- Play audio on device or Internet
 
 ## Reference
 
