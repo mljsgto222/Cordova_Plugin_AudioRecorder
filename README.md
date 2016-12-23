@@ -56,4 +56,5 @@ AudioRecorder.stopRecord(success, error)
 ## Reference
 
 [AndroidMp3Recorder](https://github.com/telescreen/AndroidMp3Recorder)
+
 [cordova-plugin-media](https://cordova.apache.org/docs/en/latest/reference/cordova-plugin-media/)

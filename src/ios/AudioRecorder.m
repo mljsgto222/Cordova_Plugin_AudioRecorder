@@ -28,6 +28,7 @@
                [NSNumber numberWithInt:IN_SAMPLING_RATE], AVSampleRateKey,
                [NSNumber numberWithInt:16], AVLinearPCMBitDepthKey,
                [NSNumber numberWithInt:2], AVNumberOfChannelsKey,
+               [NSNumber numberWithInt:kAudioConverterQuality_Max], AVEncoderAudioQualityKey,
                nil];
 
 }
