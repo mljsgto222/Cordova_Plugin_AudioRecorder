@@ -4,6 +4,7 @@ import android.content.Context;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
+import android.media.audiofx.NoiseSuppressor;
 import android.os.Environment;
 import android.os.Message;
 import android.util.Log;
@@ -27,6 +28,7 @@ public class MP3Recorder {
     private static final int BIT_RATE = 16;
 
     private AudioRecord audioRecord = null;
+    private NoiseSuppressor noiseSuppressor = null;
     private int bufferSize;
     private File cacheDir;
     private File mp3File;
@@ -90,6 +92,8 @@ public class MP3Recorder {
                     try {
                         audioRecord.stop();
                         audioRecord.release();
+                        noiseSuppressor.release();
+                        noiseSuppressor = null;
                         audioRecord = null;
 
                         Message msg = Message.obtain(encodeThread.getHandler(), DataEncodeThread.PROCESS_STOP);
@@ -139,6 +143,7 @@ public class MP3Recorder {
             Log.e(TAG, "init SimpleLame:" + result);
         }
         audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, DEFAULT_IN_SAMPLING_RATE, chanelConfig, audioFormat.getAudioFormat(), bufferSize);
+        noiseSuppressor = NoiseSuppressor.create(audioRecord.getAudioSessionId());
         int state = audioRecord.getState();
         if(state == AudioRecord.STATE_INITIALIZED){
             ringBuffer = new RingBuffer(10 * bufferSize );
@@ -150,6 +155,9 @@ public class MP3Recorder {
             audioRecord.setPositionNotificationPeriod(FRAME_COUNT);
         }else {
             audioRecord.release();
+            noiseSuppressor.release();
+            audioRecord = null;
+            noiseSuppressor = null;
         }
 
 
