@@ -65,7 +65,8 @@
         
         if([audioRecorder hasAvSession]){
             if(![audioRecorder.avSession.category isEqualToString:AVAudioSessionCategoryPlayAndRecord]){
-                [audioRecorder.avSession setCategory:AVAudioSessionCategoryRecord error:nil];
+                [audioRecorder.avSession setCategory:AVAudioSessionCategoryPlayAndRecord withOptions:AVAudioSessionCategoryOptionDefaultToSpeaker error:nil];
+                [audioRecorder.avSession setMode:AVAudioSessionModeVoiceChat error:nil];
             }
 
             if(![audioRecorder.avSession setActive:YES error:&error]){
@@ -156,6 +157,7 @@
     if([self hasAvSession]){
         if(![avSession.category isEqualToString:AVAudioSessionCategoryAmbient]){
             [self.avSession setCategory:AVAudioSessionCategoryAmbient error:nil];
+            [self.avSession setMode:AVAudioSessionModeDefault error:nil];
         }
         [self.avSession setActive:NO error: nil];
     }

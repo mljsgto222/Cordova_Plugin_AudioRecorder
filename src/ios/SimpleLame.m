@@ -15,6 +15,7 @@ static lame_global_flags *glf = nil;
     lame_set_out_samplerate(glf, outSamplerate);
     lame_set_brate(glf, outBitRate);
     lame_set_quality(glf, 7);
+    lame_set_scale(glf, 2);
     int result = lame_init_params(glf);
     return result;
 }
