@@ -36,13 +36,15 @@ public class MP3Recorder {
     private short[] buffer;
     private FileOutputStream os;
     private DataEncodeThread encodeThread;
-    private int samplingRate;
     private int chanelConfig;
     private PCMFormat audioFormat;
     private boolean isRecording = false;
-    private int bitRate;
     private long startRecordTime;
     private long endRecordTime;
+
+    private int samplingRate;
+    private int bitRate;
+    private boolean isChatMode;
 
     public MP3Recorder(Context context){
         this.samplingRate = DEFAULT_SAMPLING_RATE;
@@ -64,6 +66,10 @@ public class MP3Recorder {
 
     public void setBitRate(int bitRate){
         this.bitRate = bitRate;
+    }
+
+    public void setIsChatMode(boolean isChatMode){
+        this.isChatMode = isChatMode;
     }
 
     public boolean isRecording(){
@@ -91,10 +97,7 @@ public class MP3Recorder {
 
                     try {
                         audioRecord.stop();
-                        audioRecord.release();
-                        noiseSuppressor.release();
-                        noiseSuppressor = null;
-                        audioRecord = null;
+                        releaseAudioRecord();
 
                         Message msg = Message.obtain(encodeThread.getHandler(), DataEncodeThread.PROCESS_STOP);
                         msg.sendToTarget();
@@ -143,7 +146,9 @@ public class MP3Recorder {
             Log.e(TAG, "init SimpleLame:" + result);
         }
         audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, DEFAULT_IN_SAMPLING_RATE, chanelConfig, audioFormat.getAudioFormat(), bufferSize);
-        noiseSuppressor = NoiseSuppressor.create(audioRecord.getAudioSessionId());
+        if(isChatMode && NoiseSuppressor.isAvailable()){
+            noiseSuppressor = NoiseSuppressor.create(audioRecord.getAudioSessionId());
+        }
         int state = audioRecord.getState();
         if(state == AudioRecord.STATE_INITIALIZED){
             ringBuffer = new RingBuffer(10 * bufferSize );
@@ -154,13 +159,16 @@ public class MP3Recorder {
             audioRecord.setRecordPositionUpdateListener(encodeThread);
             audioRecord.setPositionNotificationPeriod(FRAME_COUNT);
         }else {
-            audioRecord.release();
+            releaseAudioRecord();
+        }
+    }
+
+    private void releaseAudioRecord(){
+        audioRecord.release();
+        audioRecord = null;
+        if(noiseSuppressor != null){
             noiseSuppressor.release();
-            audioRecord = null;
             noiseSuppressor = null;
         }
-
-
-
     }
 }

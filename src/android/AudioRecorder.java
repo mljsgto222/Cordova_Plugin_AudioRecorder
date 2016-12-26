@@ -21,6 +21,7 @@ public class AudioRecorder extends CordovaPlugin {
 
     private static final String OUT_SAMPLING_RATE = "outSamplingRate";
     private static final String OUT_BIT_RATE = "outBitRate";
+    private static final String IS_CHAT_MODE = "isChatMode";
 
     private MP3Recorder recorder;
 
@@ -47,6 +48,9 @@ public class AudioRecorder extends CordovaPlugin {
                         }
                         if(options.has(OUT_BIT_RATE)){
                             recorder.setBitRate(options.getInt(OUT_BIT_RATE));
+                        }
+                        if (options.has(IS_CHAT_MODE)) {
+                            recorder.setIsChatMode(options.getBoolean(IS_CHAT_MODE));
                         }
                     }catch (JSONException ex){
                         Log.e(TAG, ex.getMessage());
