@@ -24,8 +24,9 @@ AudioRecorder.startRecord(options, success, error);
 ```
 
 - __options__: recorder settings
-    - `outSamplingRate`: set sampling rate for output mp3. _default: 22050(_number_)
-    - `outBitRate`: set bit rate for output mp3. _default: 16(_number_)
+    - `outSamplingRate`: Set sampling rate for output mp3. default: 22050(_number_)
+    - `outBitRate`: Set bit rate for output mp3. default: 16(_number_)
+    - `isChatMode`: If true then set AVAudioSessionModeVoiceChat in iOS and use NoiseSuppressor in Android. default: false(_boolean_)
 
 - __success__: startRecord success callback.
 
