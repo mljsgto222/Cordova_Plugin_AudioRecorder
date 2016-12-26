@@ -4,7 +4,7 @@
 @implementation SimpleLame
 static lame_global_flags *glf = nil;
 
-+ (int)init:(int)inSamplerate outSamplerate:(int)outSamplerate outChannel:(int)outChannel outBitrate:(int)outBitRate{
++ (int)init:(int)inSamplerate outSamplerate:(int)outSamplerate outChannel:(int)outChannel outBitrate:(int)outBitRate scale:(float)scale{
     if(glf != nil){
         lame_close(glf);
         glf = nil;
@@ -15,7 +15,7 @@ static lame_global_flags *glf = nil;
     lame_set_out_samplerate(glf, outSamplerate);
     lame_set_brate(glf, outBitRate);
     lame_set_quality(glf, 7);
-    lame_set_scale(glf, 2);
+    lame_set_scale(glf, scale);
     int result = lame_init_params(glf);
     return result;
 }

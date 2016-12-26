@@ -13,6 +13,7 @@
 
 #define OUT_SAMPLING_RATE @"outSamplingRate"
 #define OUT_BIT_RATE @"outBitRate"
+#define IS_CHAT_MODE @"isChatMode"
 #define TEMP_FILE_NAME @"temp"
 
 
@@ -23,6 +24,7 @@
     documentDirectory = NSTemporaryDirectory();
     outSamplingRate = DEFAULT_OUT_SAMPLING_RATE;
     outBitRate = DEFAULT_OUT_BIT_RATE;
+    isChatMode = NO;
     setting = [NSDictionary dictionaryWithObjectsAndKeys:
                [NSNumber numberWithInt:kAudioFormatLinearPCM], AVFormatIDKey,
                [NSNumber numberWithInt:IN_SAMPLING_RATE], AVSampleRateKey,
@@ -48,6 +50,9 @@
         if([options valueForKey: OUT_BIT_RATE] != nil){
             outBitRate = [[options valueForKey:OUT_BIT_RATE] intValue];
         }
+        if([options valueForKey:IS_CHAT_MODE] != nil){
+            isChatMode = [[options valueForKey:IS_CHAT_MODE] boolValue];
+        }
     }
     
     __weak AudioRecorder* recorderSelf = self;
@@ -67,6 +72,9 @@
         if([audioRecorder hasAvSession]){
             if(![audioRecorder.avSession.category isEqualToString:AVAudioSessionCategoryPlayAndRecord]){
                 [audioRecorder.avSession setCategory:AVAudioSessionCategoryPlayAndRecord withOptions:AVAudioSessionCategoryOptionDefaultToSpeaker error:nil];
+            }
+            
+            if(audioRecorder.isChatMode){
                 [audioRecorder.avSession setMode:AVAudioSessionModeVoiceChat error:nil];
             }
 
@@ -183,7 +191,8 @@
                 short int pcmBuffer[PCM_SIZE *2];
                 unsigned char mp3Buffer[PCM_SIZE];
                 
-                [SimpleLame init:IN_SAMPLING_RATE outSamplerate:audioRecorder.outSampingRate outChannel:1 outBitrate:audioRecorder.outBitRate];
+                float scale = audioRecorder.isChatMode? 2.0: 1.0;
+                [SimpleLame init:IN_SAMPLING_RATE outSamplerate:audioRecorder.outSampingRate outChannel:1 outBitrate:audioRecorder.outBitRate scale:scale];
                 
                 long curPos;
                 BOOL hasSkipHeader = NO;

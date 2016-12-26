@@ -12,6 +12,7 @@
 
     int outBitRate;
     int outSamplingRate;
+    BOOL isChatMode;
     CFTimeInterval startRecordTime;
     CFTimeInterval endRecordTime;
     BOOL isRecording;
@@ -24,6 +25,7 @@
 @property (nonatomic, strong) NSDictionary* setting;
 @property (nonatomic) int outBitRate;
 @property (nonatomic) int outSampingRate;
+@property (nonatomic) BOOL isChatMode;
 @property (nonatomic) BOOL isRecording;
 
 - (void) startRecord:(CDVInvokedUrlCommand*) command;
