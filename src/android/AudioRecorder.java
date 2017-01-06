@@ -1,6 +1,10 @@
 package com.mljsgto222.cordova.plugin.audiorecorder;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.util.Log;
 
 import org.apache.cordova.CordovaPlugin;
@@ -24,6 +28,7 @@ public class AudioRecorder extends CordovaPlugin {
     private static final String IS_CHAT_MODE = "isChatMode";
 
     private MP3Recorder recorder;
+    private CallbackContext callback;
 
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) {
@@ -37,35 +42,68 @@ public class AudioRecorder extends CordovaPlugin {
         return false;
     }
 
-    private void startRecord(JSONArray args, CallbackContext callbackContext){
-            if(recorder == null || !recorder.isRecording()){
-                recorder = new MP3Recorder(this.cordova.getActivity());
-                if(!args.isNull(0)){
+    private boolean requestRecordPermission(){
+        boolean isPermissionGranted = cordova.hasPermission(Manifest.permission.RECORD_AUDIO);
+        if(!isPermissionGranted){
+            cordova.requestPermission(this, 1, Manifest.permission.RECORD_AUDIO);
+        }
+        return isPermissionGranted;
+    }
+
+    @Override
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
+        switch (requestCode){
+            case 1:{
+                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
                     try{
-                        JSONObject options = args.getJSONObject(0);
-                        if(options.has(OUT_SAMPLING_RATE)){
-                            recorder.setSamplingRate(options.getInt(OUT_SAMPLING_RATE));
-                        }
-                        if(options.has(OUT_BIT_RATE)){
-                            recorder.setBitRate(options.getInt(OUT_BIT_RATE));
-                        }
-                        if (options.has(IS_CHAT_MODE)) {
-                            recorder.setIsChatMode(options.getBoolean(IS_CHAT_MODE));
-                        }
-                    }catch (JSONException ex){
+                        recorder.startRecord();
+                        callback.success();
+                    }catch (IOException ex){
                         Log.e(TAG, ex.getMessage());
+                        callback.error(ex.getMessage());
                     }
+
+                }else{
+                    callback.error("user permission denied");
                 }
+                break;
+            }
+        }
+    }
+
+    private void startRecord(JSONArray args, CallbackContext callbackContext){
+        if(recorder == null || !recorder.isRecording()){
+
+            recorder = new MP3Recorder(this.cordova.getActivity());
+            if(!args.isNull(0)){
                 try{
+                    JSONObject options = args.getJSONObject(0);
+                    if(options.has(OUT_SAMPLING_RATE)){
+                        recorder.setSamplingRate(options.getInt(OUT_SAMPLING_RATE));
+                    }
+                    if(options.has(OUT_BIT_RATE)){
+                        recorder.setBitRate(options.getInt(OUT_BIT_RATE));
+                    }
+                    if (options.has(IS_CHAT_MODE)) {
+                        recorder.setIsChatMode(options.getBoolean(IS_CHAT_MODE));
+                    }
+                }catch (JSONException ex){
+                    Log.e(TAG, ex.getMessage());
+                }
+            }
+            try{
+                callback = callbackContext;
+                if(requestRecordPermission()){
                     recorder.startRecord();
                     callbackContext.success();
-                }catch (IOException ex){
-                    Log.e(TAG, ex.getMessage());
-                    callbackContext.error(ex.getMessage());
                 }
-            }else if(recorder.isRecording()){
-                callbackContext.success();
+            }catch (IOException ex){
+                Log.e(TAG, ex.getMessage());
+                callbackContext.error(ex.getMessage());
             }
+        }else if(recorder.isRecording()){
+            callbackContext.success();
+        }
     }
 
     private void stopRecord(CallbackContext callbackContext){
@@ -93,5 +131,4 @@ public class AudioRecorder extends CordovaPlugin {
             callbackContext.error("AudioRecorder has not recorded yet");
         }
     }
-
 }
