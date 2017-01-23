@@ -1,6 +1,8 @@
 package com.mljsgto222.cordova.plugin.audiorecorder;
 
+import android.app.Application;
 import android.content.Context;
+import android.content.res.Resources;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
@@ -30,7 +32,6 @@ public class MP3Recorder {
     private AudioRecord audioRecord = null;
     private NoiseSuppressor noiseSuppressor = null;
     private int bufferSize;
-    private File cacheDir;
     private File mp3File;
     private RingBuffer ringBuffer;
     private short[] buffer;
@@ -42,22 +43,24 @@ public class MP3Recorder {
     private long startRecordTime;
     private long endRecordTime;
 
+    private String appName;
+    private Context context;
+
     private int samplingRate;
     private int bitRate;
     private boolean isChatMode;
+    private boolean isSave;
 
-    public MP3Recorder(Context context){
+    public MP3Recorder(Context context) {
         this.samplingRate = DEFAULT_SAMPLING_RATE;
         this.chanelConfig = AudioFormat.CHANNEL_IN_MONO;
         this.audioFormat = PCMFormat.PCM_16BIT;
         this.bitRate = BIT_RATE;
+        this.isSave = false;
+        this.context = context;
 
-        String state = Environment.getExternalStorageState();
-        if(Environment.MEDIA_MOUNTED.equals(state)){
-            this.cacheDir = context.getExternalCacheDir();
-        }else{
-            this.cacheDir = context.getCacheDir();
-        }
+        Resources appResource = context.getResources();
+        appName = appResource.getText(appResource.getIdentifier("app_name", "string", context.getPackageName())).toString();
     }
 
     public void setSamplingRate(int samplingRate){
@@ -71,6 +74,11 @@ public class MP3Recorder {
     public void setIsChatMode(boolean isChatMode){
         this.isChatMode = isChatMode;
     }
+
+    public void setIsSave(boolean isSave){
+        this.isSave = isSave;
+    }
+
 
     public boolean isRecording(){
         return isRecording;
@@ -132,6 +140,36 @@ public class MP3Recorder {
         return mp3File;
     }
 
+    private void initMP3File() throws IOException{
+
+        String state = Environment.getExternalStorageState();
+        File directory = null;
+        if(isSave){
+            if(Environment.MEDIA_MOUNTED.equals(state)){
+                directory = context.getExternalFilesDir(appName);
+            }else{
+                directory = context.getFilesDir();
+            }
+            if(!directory.exists()){
+                directory.mkdir();
+            }
+            long timestamp = System.currentTimeMillis();
+            mp3File = new File(directory, String.valueOf(timestamp) + ".mp3");
+        }else{
+            if(Environment.MEDIA_MOUNTED.equals(state)){
+                directory = context.getExternalCacheDir();
+            }else{
+                directory = context.getCacheDir();
+            }
+            try{
+                mp3File = File.createTempFile("temp", ".mp3", directory);
+            }catch (IOException ex){
+                throw  ex;
+            }
+
+        }
+    }
+
     private void initAudioRecord() throws IOException {
         int bytesPreFrame = audioFormat.getBytesPerFrame();
         int frameSize = AudioRecord.getMinBufferSize(DEFAULT_IN_SAMPLING_RATE, chanelConfig, audioFormat.getAudioFormat()) / bytesPreFrame;
@@ -152,7 +190,7 @@ public class MP3Recorder {
         int state = audioRecord.getState();
         if(state == AudioRecord.STATE_INITIALIZED){
             ringBuffer = new RingBuffer(10 * bufferSize );
-            mp3File = File.createTempFile("temp", ".mp3", cacheDir);
+            initMP3File();
             os = new FileOutputStream(mp3File);
             encodeThread = new DataEncodeThread(ringBuffer, os, bufferSize);
             encodeThread.start();
