@@ -2,6 +2,8 @@
 
 #import <Cordova/CDV.h>
 #import <AVFoundation/AVFoundation.h>
+#import <errno.h>
+#import <string.h>
 
 #import "AudioRecorder.h"
 #import "SimpleLame.h"
@@ -14,14 +16,15 @@
 #define OUT_SAMPLING_RATE @"outSamplingRate"
 #define OUT_BIT_RATE @"outBitRate"
 #define IS_CHAT_MODE @"isChatMode"
+#define IS_SAVE @"isSave"
 #define TEMP_FILE_NAME @"temp"
 
 
 @implementation AudioRecorder
-@synthesize setting, avSession, documentDirectory, recorder, resourcePath, outBitRate, outSampingRate, isRecording;
+
+@synthesize setting, avSession, recorder, resourcePath, mp3FilePath, outBitRate, outSampingRate, isSave, isRecording;
 
 - (void) pluginInitialize{
-    documentDirectory = NSTemporaryDirectory();
     outSamplingRate = DEFAULT_OUT_SAMPLING_RATE;
     outBitRate = DEFAULT_OUT_BIT_RATE;
     isChatMode = NO;
@@ -52,6 +55,9 @@
         }
         if([options valueForKey:IS_CHAT_MODE] != nil){
             isChatMode = [[options valueForKey:IS_CHAT_MODE] boolValue];
+        }
+        if([options valueForKey:IS_SAVE] != nil){
+            isSave = [[options valueForKey:IS_SAVE] boolValue];
         }
     }
     
@@ -85,7 +91,7 @@
             }
         }
         
-        audioRecorder.resourcePath = [audioRecorder.documentDirectory stringByAppendingFormat:@"%@.pcm", TEMP_FILE_NAME];
+        audioRecorder.resourcePath = [NSTemporaryDirectory() stringByAppendingFormat:@"%@.pcm", TEMP_FILE_NAME];
         NSURL *url = [NSURL URLWithString:audioRecorder.resourcePath];
         audioRecorder.recorder = [[AVAudioRecorder alloc] initWithURL:url settings:audioRecorder.setting error:&error];
         
@@ -174,18 +180,37 @@
     endRecordTime = CACurrentMediaTime();
 }
 
+- (NSString*)getDocumentPath{
+    if([[UIDevice currentDevice].systemVersion compare:@"8.0" options:NSNumericSearch] == NSOrderedAscending){
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *basePath = paths.firstObject;
+        return basePath;
+    }else{
+        return [[[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject] relativePath];
+    }
+}
+
+- (void)setMp3FilePath{
+    long timestamp = [[NSDate date] timeIntervalSince1970];
+    if(isSave){
+        mp3FilePath = [[self getDocumentPath] stringByAppendingPathComponent:[NSString stringWithFormat:@"%ld.mp3", timestamp]];
+    }else{
+        mp3FilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-%ld.mp3", TEMP_FILE_NAME, timestamp]];
+    }
+    
+}
+
 - (void)convertMp3
 {
     __weak AudioRecorder* weakRecorder = self;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(void){
         __strong AudioRecorder* audioRecorder = weakRecorder;
         if(audioRecorder){
-            NSString *mp3FilePath = [audioRecorder.documentDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.mp3", TEMP_FILE_NAME]];
+            [audioRecorder setMp3FilePath];
             BOOL convertMp3Success = NO;
             @try{
                 int read, write;
-                
-                FILE *mp3File = fopen([mp3FilePath cStringUsingEncoding:1], "wb");
+                FILE *mp3File = fopen([audioRecorder.mp3FilePath cStringUsingEncoding:1], "wb");
                 FILE *pcmFile = fopen([audioRecorder.resourcePath cStringUsingEncoding:1], "rb");
                 
                 short int pcmBuffer[PCM_SIZE *2];
@@ -250,11 +275,12 @@
 {
     CDVPluginResult *pluginResult;
     if(flag){
-        NSString *mp3FileName = [NSString stringWithFormat:@"%@.mp3", TEMP_FILE_NAME];
+        NSURL *mp3Url = [NSURL URLWithString:mp3FilePath];
+        NSString *mp3FileName = [mp3Url lastPathComponent];
         NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
                                 mp3FileName, @"name",
                                 @"audio/mpeg", @"type",
-                                [documentDirectory stringByAppendingPathComponent:mp3FileName], @"uri",
+                                mp3FilePath, @"uri",
                                 [NSString stringWithFormat:@"%.2g", endRecordTime - startRecordTime ], @"duration",
                                 nil];
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:result];
