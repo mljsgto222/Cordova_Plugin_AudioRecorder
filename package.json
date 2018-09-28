@@ -1,0 +1,24 @@
+{
+  "name": "cordova_plugin_audiorecorder",
+  "version": "1.0.0",
+  "description": "This is a cordova plugin for audio recording",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mljsgto222/Cordova_Plugin_AudioRecorder.git"
+  },
+  "keywords": [
+    "cordova",
+    "audio",
+    "LAME",
+    "MP3"
+  ],
+  "author": "zhengz",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mljsgto222/Cordova_Plugin_AudioRecorder/issues"
+  },
+  "homepage": "https://github.com/mljsgto222/Cordova_Plugin_AudioRecorder#readme"
+}
