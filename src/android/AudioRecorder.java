@@ -3,6 +3,7 @@ package com.mljsgto222.cordova.plugin.audiorecorder;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.util.Log;
@@ -10,17 +11,19 @@ import android.util.Log;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CallbackContext;
 
+import org.apache.cordova.PluginResult;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 
 /**
  * This class echoes a string called from JavaScript.
  */
-public class AudioRecorder extends CordovaPlugin {
+public class AudioRecorder extends CordovaPlugin implements MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
     private static final String TAG = AudioRecorder.class.getName();
 
     private static final String OUT_SAMPLING_RATE = "outSamplingRate";
@@ -28,18 +31,37 @@ public class AudioRecorder extends CordovaPlugin {
     private static final String IS_CHAT_MODE = "isChatMode";
     private static final String IS_SAVE = "isSave";
 
+    private static final String STATUS_START = "start";
+    private static final String STATUS_FINISH = "finish";
+    private static final String STATUS_STOP = "stop";
+
     private MP3Recorder recorder;
     private CallbackContext callback;
+    private CallbackContext playSoundCallback;
+    private MediaPlayer mediaPlayer;
 
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) {
         if (action.equals("startRecord")) {
             startRecord(args, callbackContext);
             return true;
-        }else if(action.equals("stopRecord")) {
+        } else if (action.equals("stopRecord")) {
             stopRecord(callbackContext);
             return true;
+        } else if (action.equals("hasPermission")) {
+            hasPermission(callbackContext);
+            return true;
+        } else if (action.equals("requestPermission")) {
+            requestPermission(callbackContext);
+            return true;
+        } else if (action.equals("playSound")) {
+            playSound(args, callbackContext);
+            return true;
+        } else if (action.equals("stopSound")) {
+            stopSound(callbackContext);
+            return true;
         }
+
         return false;
     }
 
@@ -56,15 +78,8 @@ public class AudioRecorder extends CordovaPlugin {
         switch (requestCode){
             case 1:{
                 if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
-                    try{
-                        recorder.startRecord();
-                        callback.success();
-                    }catch (IOException ex){
-                        Log.e(TAG, ex.getMessage());
-                        callback.error(ex.getMessage());
-                    }
-
-                }else{
+                    callback.success();
+                } else {
                     callback.error("user permission denied");
                 }
                 break;
@@ -134,6 +149,114 @@ public class AudioRecorder extends CordovaPlugin {
         } else {
             callbackContext.error("AudioRecorder has not recorded yet");
         }
+    }
+
+    private void hasPermission(CallbackContext callbackContext) {
+        boolean isPermissionGranted = cordova.hasPermission(Manifest.permission.RECORD_AUDIO);
+        JSONObject json = new JSONObject();
+        try {
+            json.put("hasPermission", isPermissionGranted);
+        } catch (JSONException ex) {
+            callbackContext.error(ex.getMessage());
+            return ;
+        }
+        callbackContext.success(json);
+
+    }
+
+    private void requestPermission(CallbackContext callbackContext) {
+
+        if (!this.requestRecordPermission()) {
+            this.callback = callbackContext;
+        } else {
+            callbackContext.success();
+        }
+    }
+
+    private void playSound(JSONArray args, CallbackContext callbackContext) {
+        String path = null;
+        try {
+            path = args.getString(0);
+        } catch (JSONException ex) {
+            callbackContext.error(ex.getMessage());
+        }
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            mediaPlayer.stop();
+            if (this.playSoundCallback != null) {
+                this.playSoundCallback.success(STATUS_STOP);
+                this.playSoundCallback = null;
+            }
+        }
+
+        mediaPlayer = new MediaPlayer();
+        mediaPlayer.setOnCompletionListener(this);
+        mediaPlayer.setOnErrorListener(this);
+        try {
+            mediaPlayer.setDataSource(path);
+            mediaPlayer.prepare();
+            mediaPlayer.start();
+        } catch (IOException ex) {
+            callbackContext.error(ex.getMessage());
+            return;
+        }
+        this.playSoundCallback = callbackContext;
+        PluginResult result = new PluginResult(PluginResult.Status.OK, STATUS_START);
+        result.setKeepCallback(true);
+        callbackContext.sendPluginResult(result);
+
+
+    }
+
+    @Override
+    public void onCompletion(MediaPlayer mediaPlayer) {
+        if (this.playSoundCallback != null) {
+            this.playSoundCallback.success(STATUS_FINISH);
+        }
+    }
+
+    @Override
+    public boolean onError(MediaPlayer mediaPlayer, int i, int i1) {
+        if(this.playSoundCallback != null) {
+            String errorMessage;
+            switch (i) {
+                case MediaPlayer.MEDIA_ERROR_UNKNOWN:
+                    errorMessage = "unknown message";
+                    break;
+                default:
+                    switch (i1) {
+                        case MediaPlayer.MEDIA_ERROR_IO:
+                            errorMessage = "io error";
+                            break;
+                        case MediaPlayer.MEDIA_ERROR_TIMED_OUT:
+                            errorMessage = "timeout";
+                            break;
+                        case MediaPlayer.MEDIA_ERROR_UNSUPPORTED:
+                            errorMessage = "unsupported format";
+                            break;
+                        case MediaPlayer.MEDIA_ERROR_MALFORMED:
+                            errorMessage = "bit error";
+                            break;
+                        default:
+                            errorMessage = "other error";
+                            break;
+                    }
+            }
+            this.playSoundCallback.error(errorMessage);
+        }
+        return false;
+    }
+
+    private void stopSound(CallbackContext callbackContext) {
+        if (mediaPlayer != null) {
+            mediaPlayer.stop();
+            mediaPlayer = null;
+
+        }
+        if (playSoundCallback != null) {
+            playSoundCallback.success(STATUS_STOP);
+            playSoundCallback = null;
+        }
+        callbackContext.success();
     }
 
 }
