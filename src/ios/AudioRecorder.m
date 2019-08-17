@@ -19,10 +19,14 @@
 #define IS_SAVE @"isSave"
 #define TEMP_FILE_NAME @"temp"
 
+#define STATUS_START @"start"
+#define STATUS_FINISH @"finish"
+#define STATUS_STOP @"stop"
+
 
 @implementation AudioRecorder
 
-@synthesize setting, avSession, recorder, resourcePath, mp3FilePath, outBitRate, outSampingRate, isSave, isRecording;
+@synthesize setting, avSession, recorder, resourcePath, mp3FilePath, outBitRate, outSampingRate, isSave, isRecording, isChatMode, playSoundCallbackId;
 
 - (void) pluginInitialize{
     outSamplingRate = DEFAULT_OUT_SAMPLING_RATE;
@@ -35,11 +39,45 @@
                [NSNumber numberWithInt:2], AVNumberOfChannelsKey,
                [NSNumber numberWithInt:kAudioConverterQuality_Max], AVEncoderAudioQualityKey,
                nil];
-
+    
 }
 
-- (void) startRecord:(CDVInvokedUrlCommand *)command
-{
+- (void) hasPermission:(CDVInvokedUrlCommand *)command {
+    BOOL hasAvSesion = [self hasAvSession];
+    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:hasAvSesion];
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+}
+
+- (void) requestPermission:(CDVInvokedUrlCommand *)command {
+    if ([self hasAvSession]) {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    } else {
+        SEL rrpSel = NSSelectorFromString(@"requestRecordPermission:");
+        __weak AudioRecorder *recorderSelf = self;
+        __weak NSString *weakCallbackId = command.callbackId;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        [self.avSession performSelector:rrpSel withObject:^(BOOL granted){
+            __strong AudioRecorder* audioRecorder = recorderSelf;
+            __strong NSString* callbackId = weakCallbackId;
+            if(granted){
+                CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+                [audioRecorder.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+            } else {
+                audioRecorder.recorder = nil;
+                if([audioRecorder hasAvSession]){
+                    [audioRecorder.avSession setActive:NO error:nil];
+                }
+                CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Microphone permission denied."];
+                [audioRecorder.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+            }
+        }];
+#pragma clang diagnostic pop
+    }
+}
+
+- (void) startRecord:(CDVInvokedUrlCommand *)command {
     if([recorder isRecording]){
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
@@ -83,7 +121,7 @@
             if(audioRecorder.isChatMode){
                 [audioRecorder.avSession setMode:AVAudioSessionModeVoiceChat error:nil];
             }
-
+            
             if(![audioRecorder.avSession setActive:YES error:&error]){
                 pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: [NSString stringWithFormat:@"Unable to record audio: %@", [[error userInfo] description]]];
                 [audioRecorder.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
@@ -127,14 +165,15 @@
     };
     
     SEL rrpSel = NSSelectorFromString(@"requestRecordPermission:");
-    if([self hasAvSession] && [self.avSession respondsToSelector:rrpSel]){
+    if(![self hasAvSession] && [self.avSession respondsToSelector:rrpSel]){
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
         [self.avSession performSelector:rrpSel withObject:^(BOOL granted){
             __strong AudioRecorder* audioRecorder = recorderSelf;
             __strong NSString* callbackId = weakCallbackId;
             if(granted){
-                startRecording();
+                CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+                [audioRecorder.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
             } else {
                 audioRecorder.recorder = nil;
                 if([audioRecorder hasAvSession]){
@@ -259,7 +298,7 @@
                 fclose(mp3File);
                 fclose(pcmFile);
                 convertMp3Success = YES;
-            
+                
             }
             @catch(NSException *ex){
                 NSLog(@"Failed to converting audio: %@", [[ex userInfo] description]);
@@ -306,6 +345,68 @@
         }
     }
     return hasSession;
+}
+
+- (void) playSound:(CDVInvokedUrlCommand *)command {
+    NSString* path = [command.arguments objectAtIndex:0];
+    if (path == nil) {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"missing path"];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId: command.callbackId];
+    }
+    
+    if (avPlayer != nil) {
+        [avPlayer pause];
+        avPlayer = nil;
+        if (playSoundCallbackId != nil) {
+            CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:STATUS_STOP];
+            [self.commandDelegate sendPluginResult:pluginResult callbackId:playSoundCallbackId];
+            playSoundCallbackId = nil;
+        }
+    }
+    
+    NSURL *url;
+    if ([path hasPrefix:@"http://"] || [path hasPrefix:@"https://"]) {
+        url = [NSURL URLWithString:path];
+    } else {
+        url = [NSURL fileURLWithPath:path];
+    }
+    AVPlayerItem *item = [[AVPlayerItem alloc] initWithURL:url];
+    avPlayer = [[AVPlayer alloc] initWithPlayerItem:item];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:item];
+    if (avPlayer.error == nil) {
+        playSoundCallbackId = command.callbackId;
+        
+        [avPlayer play];
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:STATUS_START];
+        [pluginResult setKeepCallbackAsBool:true];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId: command.callbackId];
+        
+    } else {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString: [NSString stringWithFormat: @"play sound error: %@", [[item.error userInfo] description]]];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }
+    
+    
+}
+
+- (void) stopSound:(CDVInvokedUrlCommand *)command {
+    if (avPlayer != nil) {
+        [avPlayer pause];
+        avPlayer = nil;
+    }
+    if (playSoundCallbackId != nil) {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:STATUS_STOP];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:playSoundCallbackId];
+        playSoundCallbackId = nil;
+    }
+}
+
+- (void)didFinishPlaying:(NSNotification *)notification {
+    if (playSoundCallbackId != nil) {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:STATUS_FINISH];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:playSoundCallbackId];
+        self.playSoundCallbackId = nil;
+    }
 }
 
 @end
