@@ -1,7 +1,5 @@
 
-APP_ABI := armeabi armeabi-v7a
-APP_PLATFORM := android-8
-APP_PLATFORM := android-9
-APP_STL := stlport_static
+APP_ABI := armeabi-v7a arm64-v8a
+APP_PLATFORM := android-16
 APP_CFLAGS += -DSTDC_HEADERS
 STLPORT_FORCE_REBUILD := true

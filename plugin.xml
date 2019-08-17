@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<plugin id="com.mljsgto222.cordova.plugin.audiorecorder" version="0.7.0" 
+<plugin id="com.mljsgto222.cordova.plugin.audiorecorder" version="0.7.1" 
     xmlns="http://apache.org/cordova/ns/plugins/1.0" 
     xmlns:android="http://schemas.android.com/apk/res/android">
     <name>AudioRecorder</name>
@@ -25,6 +25,7 @@
         <source-file src="src/android/SimpleLame.java" target-dir="src/com/mljsgto222/cordova/plugin/audiorecorder" />
         <source-file src="src/android/libs/armeabi/libmp3lame.so" target-dir="libs/armeabi" />
         <source-file src="src/android/libs/armeabi-v7a/libmp3lame.so" target-dir="libs/armeabi-v7a" />
+        <source-file src="src/android/libs/arm64-v8a/libmp3lame.so" target-dir="libs/arm64-v8a" />
     </platform>
     <platform name="ios">
         <config-file parent="/*" target="config.xml">
